@@ -80,99 +80,138 @@ CURS_ZERO="\\033[0G"
 
 sh_playsena()
 {
-	local filelog
-	local cnow
-   local	LCONF=1
-   declare -i qtddezenas
-	declare -i qtdjogos=$1
-	declare -i nDescartadosNoBD=0
-	declare -i nDescartadosDuplicidade=0
+  local filelog
+  local cnow
+  local	LCONF=1
 
-   [[ $# -gt 2          ]] && die "ERRO: parâmetros em excesso. (use -h for help)"
-   [[ $# -eq 2          ]] && qtddezenas=$2 || qtddezenas=6
- 	[[ qtdjogos   -lt 1  ]] && die "ERRO: mínimo de 1 jogo brother! (use -h for help)"
- 	[[ qtddezenas -gt 15 ]] && die "ERRO: máximo de dezenas jogadas é: 15. (use -h for help)"
- 	[[ qtddezenas -lt  6 ]] && die "ERRO: mínimo de dezenas jogadas é: 6. (use -h for help)"
- 	[[ qtddezenas -gt 15 ]] && qtddezenas=15
- 	[[ qtddezenas -lt  6 ]] && qtddezenas=6
+  declare -i qtddezenas
+  declare -i qtdjogos="$1"
+  declare -i nDescartadosNoBD=0
+  declare -i nDescartadosDuplicidade=0
 
-	if [[ -e $filejogos ]]; then
-		cfiledatahora=$(sh_filedatetime "$filejogos")
-		njogos=$(sh_linecount "$filejogos")
-		sh_conf "$(DOT)Existe arquivo de jogos gerado em: ${yellow}$cfiledatahora${reset} com ${bold}${red}($njogos)${reset} palpites. Deseja substitui-lo?"
-   	LCONF=$?
-	   if ! (( LCONF )); then
-			msg "1 - Detalhes do arquivo de palpites"
-			echo -n "$bold$cyan"; stat "$filejogos"; echo -n "$reset"
-			msg "2 - Exibindo os ultimos palpites feito"
-			echo -n "$yellow"; cat "$filejogos"; echo -n "$reset"
-			exit
-	   fi
-   fi
+  (( $# > 2 )) && die "ERRO: parâmetros em excesso. (use -h for help)"
+  (( $# == 2 )) && qtddezenas="$2" || qtddezenas=6
+  (( qtdjogos < 1 )) && die "ERRO: mínimo de 1 jogo brother! (use -h for help)"
+  (( qtddezenas > 15 )) && die "ERRO: máximo de dezenas jogadas é: 15. (use -h for help)"
+  (( qtddezenas < 6 )) && die "ERRO: mínimo de dezenas jogadas é: 6. (use -h for help)"
+  (( qtddezenas > 15 )) && qtddezenas=15
+  (( qtddezenas < 6 )) && qtddezenas=6
 
-	[[ ! -e "$fileresult" ]] && :>| "$fileresult"
-	[[ $(sh_filesize "$fileresult") -eq 0 ]] && log_warning_msg "AVISO: necessário atualizar o BD. Prosseguindo..."
-	sh_update
+  if [[ -e $filejogos ]]; then
+    cfiledatahora=$(sh_filedatetime "$filejogos")
+    njogos=$(sh_linecount "$filejogos")
 
-	declare -i resto=$(( qtddezenas % 2 ))
-	declare -i metadeqtddezenas=$(( qtddezenas / 2 ))
-	declare -i outrametade="$metadeqtddezenas"
-	declare -i n=0
-	declare -i njogosregistrados=0
-	filelog=$(date +"%d%m%Y-%T" | sed 's/://g').log
+    sh_conf "$(DOT)Existe arquivo de jogos gerado em: \
+    ${yellow}$cfiledatahora${reset} com ${bold}${red}($njogos)${reset} palpites. \
+    Deseja substitui-lo?"
 
-   if (( LCONF )); then
-		:>| "$filejogos"
-	else
-		njogosregistrados=$(sh_linecount "$filejogosformatado")
-	fi
-	:>| "$filelog"
+    LCONF=$?
 
- 	if [[ resto -gt 0 ]] ; then
-		((metadeqtddezenas++))
-	fi
+    if ! (( LCONF )); then
+      msg "1 - Detalhes do arquivo de palpites"
+      echo -n "$bold$cyan"; stat "$filejogos"; echo -n "$reset"
 
-	log_wait_msg "Processando ${red}($qtdjogos)${reset} palpites, aguarde..."
-	while [[ n -lt qtdjogos ]]; do
-	  	jogos1a30="$(shuf  -e {01..30} -n "$metadeqtddezenas" | sort -n )"
-	  	jogos31a60="$(shuf -e {31..60} -n "$outrametade"      | sort -n )"
-		jogos1a30="${jogos1a30//$'\n'/ }"	 	#remove \n
-		jogos31a60="${jogos31a60//$'\n'/ }" 	#remove \n
-	   line="$jogos1a30 $jogos31a60"
-		cnow=$(sh_datetime)
-		((njogosregistrados++))
-		[[ njogosregistrados -lt 10 ]] && var="Jogo 0$njogosregistrados: " || var="Jogo $njogosregistrados: "
+      msg "2 - Exibindo os ultimos palpites feito"
+      echo -n "$yellow"; cat "$filejogos"; echo -n "$reset"
 
-  	 	if [[ qtddezenas -eq 6 ]] ; then
-			if grep -q -o "$line" "$fileresult"; then  # jogo existe no BD? descarta!
-	  			printf "Jogo ${bold}${cyan}#%04d ${yellow}%02d${reset} dezenas geradas: $pink%s${red}-> foi descartado, já existe no BD!${reset}\n" "$n" "$qtddezenas" "$line"
-				echo "$cnow $var $line -> foi descartado, já existe no BD!" >> "$filelog"
-				((nDescartadosNoBD++))
-				continue
-			fi
-		fi
+      exit
+    fi
+  fi
 
-		if grep -q -o "$line" "$filejogos"; then  # jogo existe? descarta!
-  			printf "Jogo ${bold}${cyan}#%04d ${yellow}%02d${reset} dezenas geradas: $pink%s${red}-> foi descartado, já existe no jogo atual!${reset}\n" "$n" "$qtddezenas" "$line"
-			echo "$cnow $var $line -> foi descartado, já existe no jogo atual!" >> "$filelog"
-			((nDescartadosDuplicidade++))
-			continue
-		fi
+  test ! -e "$fileresult" && > "$fileresult"
 
-		((n++))
-		printf "Jogo ${bold}${cyan}#%04d ${yellow}%02d${reset} dezenas geradas: $pink%s${green}-> foi aceito${reset}\n" "$n" "$qtddezenas" "$line"
-		echo "$line" >> "$filejogos"
-		echo "$cnow $var $line" >> "$filejogosformatado"
-		echo "$cnow $var $line -> foi aceito" >> "$filelog"
-	done
-	replicate '#' 80 >> "$filejogosformatado"
-	filetmp=$(mktemp)
-	sort "$filejogos" > "$filetmp"; cp "$filetmp" "$filejogos"; rm "$filetmp" 2> /dev/null
+  [[ $(sh_filesize "$fileresult") -eq 0 ]] && \
+    log_warning_msg "AVISO: necessário atualizar o BD. Prosseguindo..."
 
-	msg "Resumo:"
-	msg "                    Palpites aceitos : ${white}$n"
-	msg "Palpites descartados existindo no BD : ${red}$nDescartadosNoBD"
-	msg "Palpites descartados por duplicidade : ${red}$nDescartadosDuplicidade"
+  sh_update
+
+  declare -i resto=$(( qtddezenas % 2 ))
+  declare -i metadeqtddezenas=$(( qtddezenas / 2 ))
+  declare -i outrametade="$metadeqtddezenas"
+  declare -i n=0
+  declare -i njogosregistrados=0
+
+  filelog=$(date +"%d%m%Y-%T")
+  # param expansion to remove the colon
+  filelog="${filelog//:/}.log"
+
+  if (( LCONF )); then
+    > "$filejogos"
+  else
+    njogosregistrados=$(sh_linecount "$filejogosformatado")
+  fi
+
+  > "$filelog"
+
+  (( resto > 0 )) && ((metadeqtddezenas++))
+
+  log_wait_msg "Processando ${red}($qtdjogos)${reset} palpites, aguarde..."
+
+  while (( n < qtdjogos )); do
+    jogos1a30="$(shuf -e {01..30} -n "$metadeqtddezenas" | sort -n )"
+    jogos31a60="$(shuf -e {31..60} -n "$outrametade"      | sort -n )"
+
+    # removing '\n'
+    jogos1a30="${jogos1a30//$'\n'/ }"
+    jogos31a60="${jogos31a60//$'\n'/ }"
+
+    line="$jogos1a30 $jogos31a60"
+    cnow=$(sh_datetime)
+
+    ((njogosregistrados++))
+
+    (( njogosregistrados < 10 )) && \
+      var="Jogo 0$njogosregistrados: " || \
+      var="Jogo $njogosregistrados: "
+
+
+    if [[ qtddezenas -eq 6 ]] ; then
+      if grep -q -o "$line" "$fileresult"; then  # jogo existe no BD? descarta!
+
+        printf "Jogo ${bold}${cyan}#%04d ${yellow}%02d${reset} dezenas geradas: \
+          $pink%s${red}-> foi descartado, já existe no BD!${reset}\n" "$n" "$qtddezenas" "$line"
+
+        echo "$cnow $var $line -> foi descartado, já existe no BD!" >> "$filelog"
+	((nDescartadosNoBD++))
+  	continue
+      fi
+    fi
+
+    # if this generated string exists on db, throw away them
+    if grep -q -o "$line" "$filejogos"; then
+
+      printf "Jogo ${bold}${cyan}#%04d ${yellow}%02d${reset} dezenas geradas: \
+        \r$pink%s${red}-> foi descartado, já existe no jogo atual!${reset}\n" "$n" \
+        "$qtddezenas" "$line"
+
+      echo "$cnow $var $line -> foi descartado, já existe no jogo atual!" \
+        >> "$filelog"
+
+      ((nDescartadosDuplicidade++))
+      continue
+    fi
+
+    ((n++))
+
+    printf "Jogo ${bold}${cyan}#%04d ${yellow}%02d${reset} dezenas geradas: \
+      $pink%s${green}-> foi aceito${reset}\n" "$n" "$qtddezenas" "$line"
+
+    echo "$line" >> "$filejogos"
+    echo "$cnow $var $line" >> "$filejogosformatado"
+    echo "$cnow $var $line -> foi aceito" >> "$filelog"
+  done
+
+  replicate '#' 80 >> "$filejogosformatado"
+  filetmp=$(mktemp)
+
+  sort "$filejogos" > "$filetmp"
+  cp "$filetmp" "$filejogos"
+  rm "$filetmp" 2> /dev/null
+
+  msg "Resumo:"
+  msg "                    Palpites aceitos : ${white}$n"
+  msg "Palpites descartados existindo no BD : ${red}$nDescartadosNoBD"
+  msg "Palpites descartados por duplicidade : ${red}$nDescartadosDuplicidade"
 }
 
 sh_filedatetimestat(){ stat -c %w "$1"; }
